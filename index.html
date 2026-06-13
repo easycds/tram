@@ -470,6 +470,9 @@
       <label class="controle">
         <input type="checkbox" id="ed-arrondi"> Tracés arrondis
       </label>
+      <label class="controle">
+        <input type="checkbox" id="ed-bouts-droits"> Bouts droits
+      </label>
       <button id="ed-vehicule-test">🚗 Véhicule test</button>
       <span id="sel-actions" hidden>
         <button id="sel-dupliquer">Dupliquer</button>
@@ -1388,6 +1391,7 @@ const editeur = {
   largeur: 90,
   magnetisme: true,
   arrondi: false,         // routes lissées en courbes
+  boutsDroits: false,     // extrémités coupées net (collent au bord)
   curseur: null,
   selection: null,        // { kind: 'panneau'|'marquage', ref } ou { kind: 'groupe', refs }
   dragSelection: null,    // état du déplacement en cours
@@ -1522,6 +1526,7 @@ function tracerCheminLisse(ctx, pts, W, H) {
   ctx.lineTo(P[P.length - 1].x, P[P.length - 1].y);
 }
 function tracerRoute(ctx, rt, W, H) {
+  ctx.lineCap = rt.boutsDroits ? 'butt' : 'round';   // bouts droits = collent au bord
   (rt.arrondi ? tracerCheminLisse : tracerChemin)(ctx, rt.pts, W, H);
 }
 
@@ -1863,7 +1868,7 @@ function drawCartePerso(ctx, W, H, ed, apercu) {
     if (pts.length >= 2) {
       ctx.globalAlpha = 0.55;
       ctx.strokeStyle = apercu.route.trottoir ? '#c9cdd2' : '#565d66';
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.lineCap = apercu.route.boutsDroits ? 'butt' : 'round'; ctx.lineJoin = 'round';
       ctx.lineWidth = apercu.route.largeur;
       (apercu.route.arrondi ? tracerCheminLisse : tracerChemin)(ctx, pts, W, H);
       ctx.stroke();
@@ -2949,6 +2954,7 @@ ed.canvas.addEventListener('pointerdown', (e) => {
           largeur: editeur.largeur,
           trottoir: editeur.mode === 'trottoir',
           arrondi: editeur.arrondi,
+          boutsDroits: editeur.boutsDroits,
         };
       }
       editeur.enCoursRoute.pts.push(pnB);   // aimanté au bord
@@ -3372,6 +3378,10 @@ document.getElementById('ed-arrondi').addEventListener('change', (e) => {
   editeur.arrondi = e.target.checked;
   if (editeur.enCoursRoute) editeur.enCoursRoute.arrondi = editeur.arrondi;
   if (editeur.enCoursMarquage) editeur.enCoursMarquage.arrondi = editeur.arrondi;
+});
+document.getElementById('ed-bouts-droits').addEventListener('change', (e) => {
+  editeur.boutsDroits = e.target.checked;
+  if (editeur.enCoursRoute) editeur.enCoursRoute.boutsDroits = editeur.boutsDroits;
 });
 
 document.getElementById('ed-vehicule-test').addEventListener('click', () => {
