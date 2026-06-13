@@ -1395,33 +1395,19 @@ const editeur = {
   vehiculesTest: [],      // silhouettes pour tester la largeur des voies
   dragTest: null,
 };
-/* ===== MONDE DE RÉFÉRENCE FIXE (16:9 paysage) =====
-   Toutes les coordonnées pixel de la carte vivent dans ce monde
-   1280×720, INDÉPENDANT de l'écran. Chaque canvas l'affiche en
-   « contain » (carte entière visible, marges d'herbe), donc le rendu
-   est IDENTIQUE dans l'éditeur et la Scène, en portrait comme en
-   paysage : plus de rotation ni de déformation. */
-const MONDE = { W: 1280, H: 1150 };   // presque carré : grande hauteur constructible
-function transformContain(W, H) {            // monde -> écran (centré)
-  const s = Math.min(W / MONDE.W, H / MONDE.H);
-  return { s, ox: (W - MONDE.W * s) / 2, oy: (H - MONDE.H * s) / 2 };
-}
-
-/* Vue de l'éditeur : zoom utilisateur PAR-DESSUS le contain de base */
-const vueEd = { zoom: 1, panx: 0, pany: 0 };
-function pointEd(e) {                         // écran -> coordonnées MONDE
+/* Vue de l'éditeur : zoom + panoramique (écran = monde × zoom + offset) */
+const vueEd = { zoom: 1, ox: 0, oy: 0 };
+function pointEd(e) {                       // coordonnées MONDE dans l'éditeur
   const r = ed.canvas.getBoundingClientRect();
-  const t = transformContain(ed.W, ed.H);
-  const sx = e.clientX - r.left, sy = e.clientY - r.top;
   return {
-    x: ((sx - vueEd.panx) / vueEd.zoom - t.ox) / t.s,
-    y: ((sy - vueEd.pany) / vueEd.zoom - t.oy) / t.s,
+    x: (e.clientX - r.left - vueEd.ox) / vueEd.zoom,
+    y: (e.clientY - r.top  - vueEd.oy) / vueEd.zoom,
   };
 }
 function zoomerEditeur(sx, sy, facteur) {
-  const nz = Math.min(4, Math.max(1, vueEd.zoom * facteur));
-  vueEd.panx = sx - (sx - vueEd.panx) * (nz / vueEd.zoom);
-  vueEd.pany = sy - (sy - vueEd.pany) * (nz / vueEd.zoom);
+  const nz = Math.min(4, Math.max(0.3, vueEd.zoom * facteur));
+  vueEd.ox = sx - (sx - vueEd.ox) * (nz / vueEd.zoom);
+  vueEd.oy = sy - (sy - vueEd.oy) * (nz / vueEd.zoom);
   vueEd.zoom = nz;
 }
 const GRILLE = 20;
@@ -1932,19 +1918,21 @@ const DECORS = {
   rondpoint: (ctx, W, H) => drawRondPoint(ctx, W, H, REGLAGES.giratoire),
   voierapide: drawVoieRapide,
   perso: (ctx, W, H) => {
-    // Le MONDE fixe 16:9 affiché en « contain » : exactement le même
-    // rendu que l'éditeur, quel que soit le format de l'écran.
-    const t = transformContain(W, H);
+    // Même échelle que l'éditeur : mise à l'échelle UNIFORME et centrée
+    // (letterbox sur herbe), aucune déformation ni décalage.
+    const ref = carteRef.w > 0 ? carteRef : { w: W, h: H };
+    const s = Math.min(W / ref.w, H / ref.h);
     ctx.fillStyle = '#9ec79b';
     ctx.fillRect(0, 0, W, H);
     ctx.save();
-    ctx.translate(t.ox, t.oy);
-    ctx.scale(t.s, t.s);
-    drawCartePerso(ctx, MONDE.W, MONDE.H, editeur, null);
+    ctx.translate((W - ref.w * s) / 2, (H - ref.h * s) / 2);
+    ctx.scale(s, s);
+    drawCartePerso(ctx, ref.w, ref.h, editeur, null);
     ctx.restore();
   },
 };
 let decorActif = 'carrefour';
+let carteRef = { w: 0, h: 0 };   // format de l'éditeur au moment de l'envoi
 
 /* ============================================================
    HIT-TESTS DE L'ÉDITEUR
@@ -2431,18 +2419,12 @@ function boucle(temps) {
     dessinerCorbeille(sc.ctx);
   } else {
     ed.ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
-    ed.ctx.fillStyle = '#9ec79b';              // herbe partout
+    ed.ctx.fillStyle = '#9ec79b';              // herbe partout (hors-monde au dézoom)
     ed.ctx.fillRect(0, 0, ed.W, ed.H);
-    const tEd = transformContain(ed.W, ed.H);
     ed.ctx.save();
-    ed.ctx.translate(vueEd.panx, vueEd.pany);
+    ed.ctx.translate(vueEd.ox, vueEd.oy);
     ed.ctx.scale(vueEd.zoom, vueEd.zoom);
-    ed.ctx.translate(tEd.ox, tEd.oy);
-    ed.ctx.scale(tEd.s, tEd.s);
-    // Cadre clair du monde 16:9 (repère visuel des limites de la carte)
-    ed.ctx.fillStyle = '#9ec79b';
-    ed.ctx.fillRect(0, 0, MONDE.W, MONDE.H);
-    drawCartePerso(ed.ctx, MONDE.W, MONDE.H, editeur, {
+    drawCartePerso(ed.ctx, ed.W, ed.H, editeur, {
       route: (editeur.mode === 'route' || editeur.mode === 'trottoir')
         ? editeur.enCoursRoute : null,
       marquage: editeur.mode === 'marquage' ? editeur.enCoursMarquage : null,
@@ -2451,14 +2433,14 @@ function boucle(temps) {
       curseur: editeur.curseur,
       selection: editeur.mode === 'selection' ? editeur.selection : null,
     });
-    drawVehiculesTest(ed.ctx, MONDE.W, MONDE.H);
+    drawVehiculesTest(ed.ctx, ed.W, ed.H);
     if (editeur.zoneSelection) {
       const z = editeur.zoneSelection;     // coordonnées MONDE
       ed.ctx.save();
       ed.ctx.strokeStyle = '#FF3030';
       ed.ctx.fillStyle = 'rgba(255,48,48,0.08)';
-      ed.ctx.lineWidth = 1.5 / (vueEd.zoom * tEd.s);
-      ed.ctx.setLineDash([6, 5]);
+      ed.ctx.lineWidth = 1.5 / vueEd.zoom;
+      ed.ctx.setLineDash([6 / vueEd.zoom, 5 / vueEd.zoom]);
       ed.ctx.fillRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0);
       ed.ctx.strokeRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0);
       ed.ctx.setLineDash([]);
@@ -2763,7 +2745,7 @@ ed.canvas.addEventListener('pointerdown', (e) => {
     pinchEd = {
       dist: Math.hypot(b.x - a.x, b.y - a.y),
       mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2,
-      zoom: vueEd.zoom, panx: vueEd.panx, pany: vueEd.pany,
+      zoom: vueEd.zoom, ox: vueEd.ox, oy: vueEd.oy,
     };
     editeur.enCoursRoute = editeur.enCoursRoute;   // ne rien casser
     clearTimeout(timerAppui); timerAppui = null;
@@ -2777,10 +2759,10 @@ ed.canvas.addEventListener('pointermove', (e) => {
     const [a, b] = [...pointeursEd.values()];
     const d = Math.hypot(b.x - a.x, b.y - a.y);
     const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
-    const nz = Math.min(4, Math.max(1, pinchEd.zoom * (d / pinchEd.dist)));
+    const nz = Math.min(4, Math.max(0.3, pinchEd.zoom * (d / pinchEd.dist)));
     vueEd.zoom = nz;
-    vueEd.panx = mx - (pinchEd.mx - r.left - pinchEd.panx) * (nz / pinchEd.zoom);
-    vueEd.pany = my - (pinchEd.my - r.top  - pinchEd.pany) * (nz / pinchEd.zoom);
+    vueEd.ox = mx - (pinchEd.mx - r.left - pinchEd.ox) * (nz / pinchEd.zoom);
+    vueEd.oy = my - (pinchEd.my - r.top  - pinchEd.oy) * (nz / pinchEd.zoom);
   }
 }, true);
 function finPinchEd(e) {
@@ -2799,18 +2781,18 @@ let dernierTapEd = { t: 0, x: 0, y: 0 };
 /* Aimantation au bord : un point posé près d'un bord est projeté
    HORS cadre, pour que la route arrive à ras du bord (sinon son
    extrémité arrondie reste visible à l'écran). */
-const BORD_SEUIL = 70, BORD_DEPASSE = 120;   // zone d'accroche large + fort débordement hors-champ
+const BORD_SEUIL = 28, BORD_DEPASSE = 60;
 function aimanterBord(p) {
   let x = p.x, y = p.y;
   if (x < BORD_SEUIL) x = -BORD_DEPASSE;
-  else if (x > MONDE.W - BORD_SEUIL) x = MONDE.W + BORD_DEPASSE;
+  else if (x > ed.W - BORD_SEUIL) x = ed.W + BORD_DEPASSE;
   if (y < BORD_SEUIL) y = -BORD_DEPASSE;
-  else if (y > MONDE.H - BORD_SEUIL) y = MONDE.H + BORD_DEPASSE;
+  else if (y > ed.H - BORD_SEUIL) y = ed.H + BORD_DEPASSE;
   return { x, y };
 }
 /* Silhouette de voiture pour tester la largeur des voies */
 function drawVehiculesTest(ctx, W, H) {
-  const L = 74, l = 38;
+  const L = 86, l = 44;
   for (const v of editeur.vehiculesTest) {
     ctx.save();
     ctx.translate(v.x * W, v.y * H);
@@ -2888,19 +2870,19 @@ function selectionner(sel) {
 ed.canvas.addEventListener('pointerdown', (e) => {
   const pRaw = pointEd(e);
   const p = pointEditeur(e);
-  const pn = { x: p.x / MONDE.W, y: p.y / MONDE.H };
+  const pn = { x: p.x / ed.W, y: p.y / ed.H };
   const pb = aimanterBord(p);
-  const pnB = { x: pb.x / MONDE.W, y: pb.y / MONDE.H };
+  const pnB = { x: pb.x / ed.W, y: pb.y / ed.H };
 
   // Véhicule test : attrapable dans tous les modes (sauf Gomme, qui le supprime)
   if (editeur.mode !== 'gomme') {
     for (let i = editeur.vehiculesTest.length - 1; i >= 0; i--) {
       const v = editeur.vehiculesTest[i];
-      if (Math.hypot(pRaw.x - v.x * MONDE.W, pRaw.y - v.y * MONDE.H) <= 55) {
+      if (Math.hypot(pRaw.x - v.x * ed.W, pRaw.y - v.y * ed.H) <= 55) {
         editeur.dragTest = {
           ref: v,
-          dx: pRaw.x - v.x * MONDE.W,
-          dy: pRaw.y - v.y * MONDE.H,
+          dx: pRaw.x - v.x * ed.W,
+          dy: pRaw.y - v.y * ed.H,
         };
         ed.canvas.setPointerCapture(e.pointerId);
         return;
@@ -2995,12 +2977,12 @@ ed.canvas.addEventListener('pointerdown', (e) => {
     case 'gomme': {
       for (let i = editeur.vehiculesTest.length - 1; i >= 0; i--) {
         const v = editeur.vehiculesTest[i];
-        if (Math.hypot(pRaw.x - v.x * MONDE.W, pRaw.y - v.y * MONDE.H) <= 55) {
+        if (Math.hypot(pRaw.x - v.x * ed.W, pRaw.y - v.y * ed.H) <= 55) {
           editeur.vehiculesTest.splice(i, 1);
           return;
         }
       }
-      const el = trouverElement(pRaw.x, pRaw.y, MONDE.W, MONDE.H, true);
+      const el = trouverElement(pRaw.x, pRaw.y, ed.W, ed.H, true);
       if (el) {
         const tableau = el.kind === 'panneau' ? editeur.panneaux
                       : el.kind === 'marquage' ? editeur.marquages
@@ -3013,7 +2995,7 @@ ed.canvas.addEventListener('pointerdown', (e) => {
     }
 
     case 'selection': {
-      const el = trouverElement(pRaw.x, pRaw.y, MONDE.W, MONDE.H, false);
+      const el = trouverElement(pRaw.x, pRaw.y, ed.W, ed.H, false);
       const selAvant = editeur.selection;
 
       // Presser un membre du groupe sélectionné : tout le groupe se déplace
@@ -3063,10 +3045,10 @@ ed.canvas.addEventListener('pointermove', (e) => {
     const pr = pointEd(e);
     const v = editeur.dragTest.ref;
     const nx = pr.x - editeur.dragTest.dx, ny = pr.y - editeur.dragTest.dy;
-    const ddx = nx - v.x * MONDE.W, ddy = ny - v.y * MONDE.H;
+    const ddx = nx - v.x * ed.W, ddy = ny - v.y * ed.H;
     if (Math.hypot(ddx, ddy) > 4) v.angle = Math.atan2(ddy, ddx);   // Option A
-    v.x = nx / MONDE.W;
-    v.y = ny / MONDE.H;
+    v.x = nx / ed.W;
+    v.y = ny / ed.H;
     return;
   }
   if (editeur.mode === 'selection' && editeur.zoneSelection) {
@@ -3077,13 +3059,13 @@ ed.canvas.addEventListener('pointermove', (e) => {
   }
   const p = pointEditeur(e);
   const pc = modeAimanteBord() ? aimanterBord(p) : p;
-  editeur.curseur = { x: pc.x / MONDE.W, y: pc.y / MONDE.H };
+  editeur.curseur = { x: pc.x / ed.W, y: pc.y / ed.H };
 
   // Déplacement de la sélection
   if (editeur.mode === 'selection' && editeur.dragSelection && editeur.selection) {
     const pRaw = pointEd(e);
-    const dx = (pRaw.x - editeur.dragSelection.depart.x) / MONDE.W;
-    const dy = (pRaw.y - editeur.dragSelection.depart.y) / MONDE.H;
+    const dx = (pRaw.x - editeur.dragSelection.depart.x) / ed.W;
+    const dy = (pRaw.y - editeur.dragSelection.depart.y) / ed.H;
     const sel = editeur.selection;
     if (editeur.dragSelection.groupe) {
       for (const m of editeur.dragSelection.groupe) {
@@ -3121,14 +3103,14 @@ ed.canvas.addEventListener('pointerup', () => {
     if (x1 - x0 > 12 && y1 - y0 > 12) {
       const refs = [];
       for (const pa of editeur.panneaux) {
-        const px = pa.x * MONDE.W, py = pa.y * MONDE.H;
+        const px = pa.x * ed.W, py = pa.y * ed.H;
         if (px >= x0 && px <= x1 && py >= y0 && py <= y1) {
           refs.push({ kind: 'panneau', ref: pa });
         }
       }
       for (const m of editeur.marquages) {
         const c = centroide(m.pts);
-        const cx = c.x * MONDE.W, cy = c.y * MONDE.H;
+        const cx = c.x * ed.W, cy = c.y * ed.H;
         if (cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1) {
           refs.push({ kind: 'marquage', ref: m });
         }
@@ -3157,8 +3139,8 @@ let timerAppui = null;
 let appuiOrigine = null;
 
 function ouvrirMenuCtx(clientX, clientY, pCanvas) {
-  ctxCible = trouverElement(pCanvas.x, pCanvas.y, MONDE.W, MONDE.H, false);
-  ctxPoint = { x: pCanvas.x / MONDE.W, y: pCanvas.y / MONDE.H };
+  ctxCible = trouverElement(pCanvas.x, pCanvas.y, ed.W, ed.H, false);
+  ctxPoint = { x: pCanvas.x / ed.W, y: pCanvas.y / ed.H };
   document.getElementById('ctx-copier').disabled = !ctxCible;
   document.getElementById('ctx-supprimer').disabled = !ctxCible;
   document.getElementById('ctx-coller').disabled = !pressePapier;
@@ -3347,10 +3329,10 @@ function appliquerTransformSelection() {
   } else {
     const cos = Math.cos(th), sin = Math.sin(th);
     sel.ref.pts.forEach((p, i) => {
-      const dx = (sel.base.pts[i].x - sel.base.cx) * MONDE.W * k;
-      const dy = (sel.base.pts[i].y - sel.base.cy) * MONDE.H * k;
-      p.x = sel.base.cx + (dx * cos - dy * sin) / MONDE.W;
-      p.y = sel.base.cy + (dx * sin + dy * cos) / MONDE.H;
+      const dx = (sel.base.pts[i].x - sel.base.cx) * ed.W * k;
+      const dy = (sel.base.pts[i].y - sel.base.cy) * ed.H * k;
+      p.x = sel.base.cx + (dx * cos - dy * sin) / ed.W;
+      p.y = sel.base.cy + (dx * sin + dy * cos) / ed.H;
     });
   }
 }
@@ -3465,6 +3447,7 @@ inputFichier.addEventListener('change', async () => {
 
 document.getElementById('ed-utiliser').addEventListener('click', () => {
   terminerTrace();
+  carteRef = { w: ed.W, h: ed.H };
   if (editeur.routes.length === 0 &&
       editeur.marquages.length === 0 &&
       editeur.panneaux.length === 0) return;
@@ -3499,7 +3482,7 @@ function activerCarte(i) {
 }
 selectCarte.addEventListener('change', () => activerCarte(Number(selectCarte.value)));
 document.getElementById('ed-zoom-reset').addEventListener('click', () => {
-  vueEd.zoom = 1; vueEd.panx = 0; vueEd.pany = 0;
+  vueEd.zoom = 1; vueEd.ox = 0; vueEd.oy = 0;
 });
 document.getElementById('ed-undo').addEventListener('click', annulerEditeur);
 document.getElementById('ed-redo').addEventListener('click', retablirEditeur);
@@ -3531,6 +3514,7 @@ function choisirDecor(nom) {
   decorActif = nom;
   document.getElementById('zone-giratoire').hidden = nom !== 'rondpoint';
   if (nom === 'perso') {
+    if (ed.W > 0) carteRef = { w: ed.W, h: ed.H };
     reinitialiserVue();                      // la carte s'affiche à 100 %, sans décalage
   }
   for (const b of document.querySelectorAll('#choix-decor button')) {
