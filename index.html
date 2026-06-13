@@ -1402,8 +1402,8 @@ const editeur = {
    est IDENTIQUE dans l'éditeur et la Scène, en portrait comme en
    paysage : plus de rotation ni de déformation. */
 const MONDE = { W: 1280, H: 1150 };   // presque carré : grande hauteur constructible
-function transformContain(W, H) {            // monde -> écran (centré)
-  const s = Math.min(W / MONDE.W, H / MONDE.H);
+function transformContain(W, H) {            // monde -> écran : COVER (remplit, centré)
+  const s = Math.max(W / MONDE.W, H / MONDE.H);
   return { s, ox: (W - MONDE.W * s) / 2, oy: (H - MONDE.H * s) / 2 };
 }
 
@@ -2439,9 +2439,8 @@ function boucle(temps) {
     ed.ctx.scale(vueEd.zoom, vueEd.zoom);
     ed.ctx.translate(tEd.ox, tEd.oy);
     ed.ctx.scale(tEd.s, tEd.s);
-    // Zone constructible : fond clair (distinct de l'herbe du hors-champ)
-    // pour bien voir les limites, avec un liseré net sur le pourtour.
-    ed.ctx.fillStyle = '#eef0f3';
+    // Même fond herbe que la Scène : l'éditeur montre exactement le rendu final.
+    ed.ctx.fillStyle = '#9ec79b';
     ed.ctx.fillRect(0, 0, MONDE.W, MONDE.H);
     drawCartePerso(ed.ctx, MONDE.W, MONDE.H, editeur, {
       route: (editeur.mode === 'route' || editeur.mode === 'trottoir')
@@ -2452,10 +2451,6 @@ function boucle(temps) {
       curseur: editeur.curseur,
       selection: editeur.mode === 'selection' ? editeur.selection : null,
     });
-    // Liseré de la limite constructible
-    ed.ctx.strokeStyle = '#c0392b';
-    ed.ctx.lineWidth = 3 / (vueEd.zoom * tEd.s);
-    ed.ctx.strokeRect(0, 0, MONDE.W, MONDE.H);
     drawVehiculesTest(ed.ctx, MONDE.W, MONDE.H);
     if (editeur.zoneSelection) {
       const z = editeur.zoneSelection;     // coordonnées MONDE
@@ -2804,7 +2799,7 @@ let dernierTapEd = { t: 0, x: 0, y: 0 };
 /* Aimantation au bord : un point posé près d'un bord est projeté
    HORS cadre, pour que la route arrive à ras du bord (sinon son
    extrémité arrondie reste visible à l'écran). */
-const BORD_SEUIL = 70, BORD_DEPASSE = 120;   // zone d'accroche large + fort débordement hors-champ
+const BORD_SEUIL = 70, BORD_DEPASSE = 400;   // débordement large : la route atteint toujours le bord de l'écran (cover)
 function aimanterBord(p) {
   let x = p.x, y = p.y;
   if (x < BORD_SEUIL) x = -BORD_DEPASSE;
