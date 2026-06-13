@@ -296,6 +296,14 @@
   .vue { flex: 1; position: relative; display: flex; flex-direction: column; }
   .vue.cachee { display: none; }
   .zone-canvas { flex: 1; position: relative; }
+  /* Les deux vues utilisent la palette flottante : canvas pleine hauteur,
+     outils par-dessus. Hauteurs identiques -> rendu « cover » cohérent. */
+  #vue-editeur header { display: none; }
+  #vue-editeur { position: relative; }
+  #vue-editeur .zone-canvas { position: absolute; inset: 0; }
+  .palette-panneau .controle { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+  .palette-panneau .controle input[type=range] { width: 100%; }
+  .palette select, .palette-panneau select { width: 100%; }
   canvas {
     position: absolute;
     inset: 0;
@@ -417,21 +425,36 @@
 
 <!-- ================= VUE ÉDITEUR ================= -->
 <div class="vue cachee" id="vue-editeur">
-  <header>
-    <button class="btn-replier" id="replier-editeur" title="Replier / déplier la barre">▴ Menu</button>
-    <div class="groupe" data-titre="Scènes">
+  <div class="palette" id="palette-editeur">
+    <div class="palette-rail" id="palette-rail-ed">
+      <div class="palette-grip" id="palette-grip-ed" title="Déplacer la palette"></div>
+      <button class="pal-ico" data-paled="scenes" title="Scènes">🗂️</button>
+      <button class="pal-ico" data-paled="outils" title="Outils">🛠️</button>
+      <button class="pal-ico" data-paled="reglages" title="Réglages de l'outil">⚙️</button>
+      <button class="pal-ico" data-paled="carte" title="Carte">💾</button>
+      <button class="pal-ico" data-paled="utiliser" title="Utiliser dans la scène">➡️</button>
+    </div>
+
+    <div class="palette-panneau" id="paled-scenes" data-pour="scenes">
+      <h4>Scènes</h4>
       <select id="choix-carte" aria-label="Scène en cours"></select>
       <button id="btn-nouvelle-carte">+ Scène</button>
     </div>
-    <div class="groupe" data-titre="Outils" id="choix-mode">
-      <button data-mode="route" class="actif">Route</button>
-      <button data-mode="trottoir">Trottoir</button>
-      <button data-mode="marquage">Marquage</button>
-      <button data-mode="panneau">Panneau</button>
-      <button data-mode="selection">Sélection</button>
-      <button data-mode="gomme">Gomme</button>
+
+    <div class="palette-panneau" id="paled-outils" data-pour="outils">
+      <h4>Outils</h4>
+      <div id="choix-mode">
+        <button data-mode="route" class="actif">Route</button>
+        <button data-mode="trottoir">Trottoir</button>
+        <button data-mode="marquage">Marquage</button>
+        <button data-mode="panneau">Panneau</button>
+        <button data-mode="selection">Sélection</button>
+        <button data-mode="gomme">Gomme</button>
+      </div>
     </div>
-    <div class="groupe" data-titre="Réglages de l'outil">
+
+    <div class="palette-panneau" id="paled-reglages" data-pour="reglages">
+      <h4>Réglages de l'outil</h4>
       <select id="type-marquage" aria-label="Type de marquage" hidden>
         <option value="stop">Ligne STOP</option>
         <option value="cedez">Ligne cédez-le-passage</option>
@@ -464,20 +487,20 @@
         <input type="range" id="ed-largeur" min="50" max="150" step="10" value="90">
         <span id="ed-largeur-val">90</span>
       </label>
-      <label class="controle">
+      <label class="controle" style="flex-direction:row;align-items:center;gap:6px">
         <input type="checkbox" id="ed-magnetisme" checked> Magnétisme
       </label>
-      <label class="controle">
+      <label class="controle" style="flex-direction:row;align-items:center;gap:6px">
         <input type="checkbox" id="ed-arrondi"> Tracés arrondis
       </label>
-      <label class="controle">
+      <label class="controle" style="flex-direction:row;align-items:center;gap:6px">
         <input type="checkbox" id="ed-bouts-droits"> Bouts droits
       </label>
       <button id="ed-vehicule-test">🚗 Véhicule test</button>
       <span id="sel-actions" hidden>
         <button id="sel-dupliquer">Dupliquer</button>
         <button id="sel-supprimer" class="danger">Supprimer</button>
-        <label class="controle" id="sel-taille-zone" hidden>Taille %
+        <label class="controle" id="sel-taille-zone" hidden>Taille %
           <input type="range" id="sel-taille" min="30" max="220" step="5" value="100">
         </label>
         <label class="controle" id="sel-rot-zone" hidden>Rotation
@@ -485,23 +508,29 @@
         </label>
       </span>
     </div>
-    <div class="groupe" data-titre="Carte">
-      <button id="ed-zoom-reset" title="Réinitialiser le zoom">🔍 100 %</button>
-      <button id="ed-undo" title="Annuler (Ctrl+Z)">↶</button>
-      <button id="ed-redo" title="Rétablir (Ctrl+Y)">↷</button>
-      <button id="ed-terminer">Terminer</button>
-      <button id="ed-annuler">Annuler pt</button>
+
+    <div class="palette-panneau" id="paled-carte" data-pour="carte">
+      <h4>Carte</h4>
+      <div class="ligne">
+        <button id="ed-undo" title="Annuler (Ctrl+Z)">↶</button>
+        <button id="ed-redo" title="Rétablir (Ctrl+Y)">↷</button>
+        <button id="ed-zoom-reset" title="Réinitialiser le zoom">🔍 100 %</button>
+      </div>
+      <button id="ed-terminer">Terminer le tracé</button>
+      <button id="ed-annuler">Annuler dernier point</button>
       <button id="ed-exporter">Exporter</button>
       <button id="ed-importer">Importer</button>
       <button id="ed-effacer" class="danger">Tout effacer</button>
-    </div>
-    <div class="groupe pousse-droite">
       <button id="btn-info-ed" title="Afficher les astuces">ℹ Infos</button>
+    </div>
+
+    <div class="palette-panneau" id="paled-utiliser" data-pour="utiliser">
+      <h4>Scène</h4>
       <button id="ed-utiliser" class="actif">Utiliser dans la scène →</button>
     </div>
-    <input type="file" id="ed-fichier" accept=".json,application/json" hidden>
-    <span class="aide" id="ed-aide">Mode Route : tapez pour poser les points, double-tap ou « Terminer » pour clore. Les routes sont nues : marquages et panneaux s'ajoutent avec les autres modes.</span>
-  </header>
+  </div>
+  <input type="file" id="ed-fichier" accept=".json,application/json" hidden>
+  <span class="aide" id="ed-aide" hidden>Mode Route : tapez pour poser les points, double-tap ou « Terminer » pour clore. Les routes sont nues : marquages et panneaux s'ajoutent avec les autres modes.</span>
   <div class="zone-canvas"><canvas id="canvas-editeur"></canvas></div>
 </div>
 
@@ -2804,7 +2833,7 @@ let dernierTapEd = { t: 0, x: 0, y: 0 };
 /* Aimantation au bord : un point posé près d'un bord est projeté
    HORS cadre, pour que la route arrive à ras du bord (sinon son
    extrémité arrondie reste visible à l'écran). */
-const BORD_SEUIL = 70, BORD_DEPASSE = 400;   // débordement large : la route atteint toujours le bord de l'écran (cover)
+const BORD_SEUIL = 70, BORD_DEPASSE = 2000;  // débordement très large : la route sort de l'écran quel que soit le débordement du monde (cover)
 function aimanterBord(p) {
   let x = p.x, y = p.y;
   if (x < BORD_SEUIL) x = -BORD_DEPASSE;
@@ -3513,14 +3542,81 @@ document.getElementById('ed-zoom-reset').addEventListener('click', () => {
 });
 document.getElementById('ed-undo').addEventListener('click', annulerEditeur);
 document.getElementById('ed-redo').addEventListener('click', retablirEditeur);
+/* Copier la sélection courante (élément seul OU groupe) dans le presse-papier */
+function copierSelection() {
+  const sel = editeur.selection;
+  if (!sel) return false;
+  if (sel.kind === 'groupe') {
+    pressePapier = { kind: 'groupe', items: sel.refs.map(r => ({
+      kind: r.kind, data: JSON.parse(JSON.stringify(r.ref)) })) };
+  } else {
+    pressePapier = { kind: sel.kind, data: JSON.parse(JSON.stringify(sel.ref)) };
+  }
+  return true;
+}
+/* Coller au curseur (ou légèrement décalé si le curseur est hors carte) */
+function collerPressePapier() {
+  if (!pressePapier) return;
+  const cur = editeur.curseur || { x: 0.5, y: 0.5 };
+  const poser = (kind, data, cx, cy) => {
+    const copie = JSON.parse(JSON.stringify(data));
+    if (kind === 'panneau') {
+      copie.x = cx; copie.y = cy;
+      editeur.panneaux.push(copie);
+      return { kind, ref: copie };
+    } else {
+      const c = centroide(copie.pts);
+      for (const pt of copie.pts) { pt.x += cx - c.x; pt.y += cy - c.y; }
+      editeur.marquages.push(copie);
+      return { kind, ref: copie };
+    }
+  };
+  if (pressePapier.kind === 'groupe') {
+    // Recentrer le groupe sur le curseur en conservant les positions relatives
+    const pts = pressePapier.items.map(it => it.kind === 'panneau'
+      ? { x: it.data.x, y: it.data.y } : centroide(it.data.pts));
+    const gx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const gy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    const refs = pressePapier.items.map((it, i) =>
+      poser(it.kind, it.data, cur.x + (pts[i].x - gx), cur.y + (pts[i].y - gy)));
+    selectionner({ kind: 'groupe', refs });
+  } else {
+    const ref = poser(pressePapier.kind, pressePapier.data, cur.x, cur.y);
+    selectionner(ref);
+  }
+  majBoutonPerso();
+}
+/* Supprimer la sélection courante */
+function supprimerSelection() {
+  const sel = editeur.selection;
+  if (!sel) return;
+  const ret = (kind, ref) => {
+    const tab = kind === 'panneau' ? editeur.panneaux : editeur.marquages;
+    const i = tab.indexOf(ref); if (i >= 0) tab.splice(i, 1);
+  };
+  if (sel.kind === 'groupe') sel.refs.forEach(r => ret(r.kind, r.ref));
+  else ret(sel.kind, sel.ref);
+  selectionner(null);
+  majBoutonPerso();
+}
+
 window.addEventListener('keydown', (e) => {
   const editeurActif = !vues.editeur.classList.contains('cachee');
   if (!editeurActif) return;
   const k = e.key.toLowerCase();
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === 'z') {
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (ctrl && !e.shiftKey && k === 'z') {
     e.preventDefault(); annulerEditeur();
-  } else if ((e.ctrlKey || e.metaKey) && (k === 'y' || (e.shiftKey && k === 'z'))) {
+  } else if (ctrl && (k === 'y' || (e.shiftKey && k === 'z'))) {
     e.preventDefault(); retablirEditeur();
+  } else if (ctrl && k === 'c') {
+    if (copierSelection()) e.preventDefault();
+  } else if (ctrl && k === 'x') {
+    if (copierSelection()) { supprimerSelection(); e.preventDefault(); }
+  } else if (ctrl && k === 'v') {
+    if (pressePapier) { collerPressePapier(); e.preventDefault(); }
+  } else if ((k === 'delete' || k === 'backspace') && editeur.selection) {
+    supprimerSelection(); e.preventDefault();
   }
 });
 document.getElementById('btn-nouvelle-carte').addEventListener('click', () => {
@@ -3683,16 +3779,53 @@ visionVitesseInput.addEventListener('input', () => {
   visionKmh.textContent = vitesseVision + ' km/h';
 });
 
-// Barre repliable de l'éditeur (la Scène utilise la palette flottante)
-{
-  const btn = document.getElementById('replier-editeur');
-  const hdr = document.querySelector('#vue-editeur header');
-  btn.addEventListener('click', () => {
-    const replie = hdr.classList.toggle('replie');
-    btn.textContent = replie ? '▾ Menu' : '▴ Menu';
-    requestAnimationFrame(() => { sc.resize(); ed.resize(); });
+/* ===== Palette flottante de l'Éditeur (même principe que la Scène) ===== */
+(function initPaletteEditeur() {
+  const palette = document.getElementById('palette-editeur');
+  if (!palette) return;
+  const rail = document.getElementById('palette-rail-ed');
+  const icones = [...rail.querySelectorAll('.pal-ico')];
+  const panneaux = [...palette.querySelectorAll('.palette-panneau')];
+  let ouvert = null;
+  function fermer() {
+    ouvert = null;
+    for (const p of panneaux) p.classList.remove('ouvert');
+    for (const i of icones) i.classList.remove('actif');
+  }
+  for (const ico of icones) {
+    ico.addEventListener('click', () => {
+      const cle = ico.dataset.paled;
+      if (ouvert === cle) { fermer(); return; }
+      fermer();
+      ouvert = cle;
+      ico.classList.add('actif');
+      const pan = palette.querySelector('.palette-panneau[data-pour="' + cle + '"]');
+      if (pan) pan.classList.add('ouvert');
+    });
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (!palette.contains(e.target)) fermer();
+  }, true);
+  const grip = document.getElementById('palette-grip-ed');
+  let drag = null;
+  grip.addEventListener('pointerdown', (e) => {
+    const r = palette.getBoundingClientRect();
+    drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    grip.setPointerCapture(e.pointerId);
   });
-}
+  grip.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const par = palette.parentElement.getBoundingClientRect();
+    let x = e.clientX - par.left - drag.dx;
+    let y = e.clientY - par.top - drag.dy;
+    x = Math.max(4, Math.min(par.width - 60, x));
+    y = Math.max(4, Math.min(par.height - 60, y));
+    palette.style.left = x + 'px';
+    palette.style.top = y + 'px';
+  });
+  grip.addEventListener('pointerup', () => { drag = null; });
+  grip.addEventListener('pointercancel', () => { drag = null; });
+})();
 
 /* ===== Palette flottante de la Scène ===== */
 (function initPalette() {
