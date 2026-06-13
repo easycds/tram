@@ -2799,7 +2799,7 @@ let dernierTapEd = { t: 0, x: 0, y: 0 };
 /* Aimantation au bord : un point posé près d'un bord est projeté
    HORS cadre, pour que la route arrive à ras du bord (sinon son
    extrémité arrondie reste visible à l'écran). */
-const BORD_SEUIL = 28, BORD_DEPASSE = 60;
+const BORD_SEUIL = 70, BORD_DEPASSE = 120;   // zone d'accroche large + fort débordement hors-champ
 function aimanterBord(p) {
   let x = p.x, y = p.y;
   if (x < BORD_SEUIL) x = -BORD_DEPASSE;
