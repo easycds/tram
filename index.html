@@ -1401,7 +1401,7 @@ const editeur = {
    « contain » (carte entière visible, marges d'herbe), donc le rendu
    est IDENTIQUE dans l'éditeur et la Scène, en portrait comme en
    paysage : plus de rotation ni de déformation. */
-const MONDE = { W: 1280, H: 720 };
+const MONDE = { W: 1280, H: 1150 };   // presque carré : grande hauteur constructible
 function transformContain(W, H) {            // monde -> écran (centré)
   const s = Math.min(W / MONDE.W, H / MONDE.H);
   return { s, ox: (W - MONDE.W * s) / 2, oy: (H - MONDE.H * s) / 2 };
